@@ -14,6 +14,7 @@ class BertCLSModel(nn.Module):
         self.dropout = nn.Dropout(args.dropout)
         self.fc1 = nn.Linear(self.bert.config.hidden_size, args.class_num)
         self.class_num = args.class_num
+        self.sigmod = nn.Sigmoid()
 
 
     def forward(self, batch_data):
@@ -23,8 +24,9 @@ class BertCLSModel(nn.Module):
         outputs = self.bert(tokens_tensor, attention_mask=att_mask, token_type_ids=segments_tensors)
         class_encode = outputs[1]
         class_encode = self.dropout(class_encode)
-        o = self.fc1(class_encode)
-        out = (o, o)
+        logit = self.fc1(class_encode)
+        pre = self.sigmod(logit)
+        out = (logit, pre)
 
         return out
 

@@ -103,17 +103,20 @@ class QaModel():
         ''' 构建三个数据集的评估回调函数 '''
         if self.args.have_val == True:
             self.eval_fun = EvaluateMetrics(metric=Metrics,
+                                            args=args,
                                             generator=self.dev_generator,
                                             save_model_callback=None,
                                             mode=eval_mode,
                                             log=self.log)
             self.test_fun = EvaluateMetrics(metric=Metrics,
+                                            args=args,
                                             generator=self.test_generator,
                                             save_model_callback=self.save_callback,
                                             mode=eval_mode,
                                             log=self.log)
         else:
             self.test_fun = EvaluateMetrics(metric=Metrics,
+                                            args=args,
                                             generator=self.test_generator,
                                             save_model_callback=self.save_callback,
                                             mode=eval_mode,
@@ -123,10 +126,11 @@ class QaModel():
 
         if args.eval_train:
             self.train_eval_fun = EvaluateMetrics(metric=Metrics,
-                                            generator=self.train_generator,
-                                            save_model_callback=None,
-                                            mode=eval_mode,
-                                            log=self.log)
+                                                  args=args,
+                                                  generator=self.train_generator,
+                                                  save_model_callback=None,
+                                                  mode=eval_mode,
+                                                  log=self.log)
 
 
         ''' 加载已经存在的模型 '''
@@ -240,14 +244,10 @@ class QaModel():
             ''' 对训练数据进行一次评估 '''
             if self.args.eval_train:
                 pred = np.concatenate(predictions, axis=0)
-
                 if pred.shape[-1] >= 2:
-                    num = len(pred)
-                    labels = self.train_eval_fun.dev_y.astype(np.int32)
-                    labels = labels[:num]
-                    labels = np.expand_dims(labels, axis=-1)
-                    pred = pred.take(labels, axis=-1)
+                    pred = np.argmax(pred, axis=-1)
 
+                self.train_eval_fun.set_thre(0.5)
                 self.train_eval_fun.eval(epoch=epoch, pred=pred, step=epoch, summary_writer=self.summary_writer, mode='Train')
 
 
@@ -290,14 +290,9 @@ class QaModel():
             ''' 进行评估 '''
             pred = np.concatenate(res, axis=0)
             if pred.shape[-1] >= 2:
-                labels = self.eval_fun.dev_y.astype(np.int)
-                assert len(labels) == len(pred)
-                res = []
-                for pre, ind in zip(pred, labels):
-                    res.append([pre[ind]])
-                res = np.array(res)
-                pred = res
+                pred = np.argmax(pred, axis=-1)
 
+            self.eval_fun.set_thre(0.5)
             self.eval_fun.eval(epoch=epoch, pred=pred, step=epoch, summary_writer=self.summary_writer, mode='Eval')
 
 
@@ -326,14 +321,9 @@ class QaModel():
             ''' 进行评估 '''
             pred = np.concatenate(res, axis=0)
             if pred.shape[-1] >= 2:
-                labels = self.test_fun.dev_y.astype(np.int)
-                assert len(labels) == len(pred)
-                res = []
-                for pre, ind in zip(pred, labels):
-                    res.append([pre[ind]])
-                res = np.array(res)
-                pred = res
+                pred = np.argmax(pred, axis=-1)
 
+            self.test_fun.set_thre(0.5)
             self.test_fun.eval(epoch=epoch, pred=pred, step=epoch, summary_writer=self.summary_writer, mode='Test')
 
     def para_freezer(self, freeze_layer):

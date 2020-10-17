@@ -57,6 +57,8 @@ class ToBertInput():
         y = np.array(y) # [b]
         if self.args.class_num == 1:
             y = np.expand_dims(y, axis=-1) # [b, 1]
+            y[y > 0.5] = 1.0  # 将标签从 0 1转化为 -1 1 , 然后输入 sigmod 函数，得到 0 1 输出
+            y[y < 0.5] = -1.0
 
         ''' 数据如果不足以并行，则需要重复 '''
         batch_size = y.shape[0]

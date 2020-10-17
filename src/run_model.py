@@ -6,7 +6,7 @@ from model.qa_mode.qa_model import QaModel
 from utils.set_random_seed import setup_seed
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "5,6,7,9"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,2,3,4"
 ''' 定义参数和默认值 '''
 parser = argparse.ArgumentParser()
 

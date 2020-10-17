@@ -110,6 +110,7 @@ class EvaluateMetrics():
     def __init__(
         self,
         metric,
+        args,
         generator=None,
         save_model_callback = None,
         once_every: int = 1,
@@ -125,9 +126,14 @@ class EvaluateMetrics():
         self.save_model_callback = save_model_callback
         self._verbose = verbose
         self.mode = mode
+        self.args = args
+
+    def set_thre(self, thre):
+        for metric in self.metrics:
+            metric.threshold = thre
 
     def eval_metric_on_data_frame(
-        cls,
+        self,
         metric: BaseMetric,
         id_left: typing.Union[list, np.array],
         y: typing.Union[list, np.array],
@@ -139,8 +145,6 @@ class EvaluateMetrics():
             'pred': y_pred.squeeze()
         })
         assert isinstance(metric, BaseMetric)
-
-        eval_df = eval_df.groupby('id').apply(f)
 
         eval_df['id'] = np.ones_like(eval_df['id'])
 
@@ -202,11 +206,16 @@ class EvaluateMetrics():
                 self.save_model_callback(val_logs, epoch)
 
 
-def f(group):
+def f_first(group):
     index = group['pred'].idxmax()
     group.loc[index, 'pred'] = -1000.0
     group.loc[group['pred'] != -1000, 'pred' ] = 0.0
     group.loc[group['pred'] == -1000, 'pred'] = 1.0
+    return group
+
+def f_th(group):
+    group.loc[group['pred'] >= th, 'pred' ] = 0.0
+    group.loc[group['pred'] < th, 'pred'] = 1.0
     return group
 
 if __name__ == '__main__':
@@ -220,7 +229,7 @@ if __name__ == '__main__':
 
     print(eval_df)
 
-    eval_df = eval_df.groupby('id').apply(f)
+    eval_df = eval_df.groupby('id').apply(f_first)
 
     eval_df['id'] = np.ones_like(eval_df['id'])
 
