@@ -14,7 +14,7 @@ from tensorboardX import SummaryWriter
 import torch.nn as nn
 from .model.bert_cls_model import BertCLSModel
 import torch.optim as optim
-
+import time
 
 
 class QaModel():
@@ -47,8 +47,10 @@ class QaModel():
         logger.addHandler(fhl)
         self.log = logger
 
+        localtime = time.asctime(time.localtime(time.time()))
+
         self.log.info('\n')
-        self.log.info('***---------------------------------------------------------------------***')
+        self.log.info('Exp: %s ---------------------------------%s----------------------------------------' % (args.exp_name, localtime))
         ''' 保存超参 '''
         self.args = args
         logger.info(args)
