@@ -16,7 +16,7 @@ logger.setLevel(logging.DEBUG)
 
 
 script_abs_path = os.path.dirname(__file__)
-ROOT_DIR = os.path.join(script_abs_path, '../')
+ROOT_DIR = os.path.join(script_abs_path, '../../')
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
 RAW_DATA = os.path.join(DATA_DIR, 'raw_data')
 

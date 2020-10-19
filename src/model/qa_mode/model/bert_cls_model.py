@@ -1,8 +1,10 @@
 # coding=utf-8
 
 import torch.nn as nn
-from torch.nn import  MSELoss,CrossEntropyLoss
+from torch.nn import  MSELoss, CrossEntropyLoss, BCELoss
 from transformers import BertModel, BertConfig
+import torch.nn.functional as F
+import torch
 
 class BertCLSModel(nn.Module):
     def __init__(self, bert_model_dir, args):
@@ -12,9 +14,10 @@ class BertCLSModel(nn.Module):
         self.config.output_attentions = False
         self.bert = BertModel.from_pretrained(bert_model_dir, config=self.config)
         self.dropout = nn.Dropout(args.dropout)
-        self.fc1 = nn.Linear(self.bert.config.hidden_size, args.class_num)
+        self.fc1 = nn.Linear(4*self.bert.config.hidden_size, args.class_num)
         self.class_num = args.class_num
         self.sigmod = nn.Sigmoid()
+
 
 
     def forward(self, batch_data):
@@ -22,16 +25,25 @@ class BertCLSModel(nn.Module):
 
         tokens_tensor, segments_tensors, att_mask, _,_,_, labels = batch_data
         outputs = self.bert(tokens_tensor, attention_mask=att_mask, token_type_ids=segments_tensors)
-        class_encode = outputs[1]
+        seq_hidden = outputs[0] # [b, seq, hid]
+
+        q, _ = torch.max(seq_hidden, dim=1) # [b, hid]
+        a = torch.mean(seq_hidden, dim=1) # [b, hid]
+        t = seq_hidden[:, -1] # [b, hid]
+        e = seq_hidden[:, 0] # [b, hid]
+
+        class_encode = torch.cat([q, a, t, e], dim=-1) # [b, 4*hid]
+
         class_encode = self.dropout(class_encode)
         logit = self.fc1(class_encode)
         pre = self.sigmod(logit)
-        out = (logit, pre)
+        out = (pre, pre)
 
         return out
 
     def get_loss_function(self):
         if self.class_num == 1:
-            return MSELoss()
+            # return MSELoss()
+            return BCELoss()
         else:
             return CrossEntropyLoss()

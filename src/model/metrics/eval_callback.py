@@ -11,11 +11,14 @@ import torch
 from .f1 import F1
 from .percision import Precision
 from .recall import Recall
+from .auc import AUC
 
 Metrics = [
    Precision(),
    Recall(),
-   F1()
+   F1(),
+   AUC()
+
 ]
 
 
@@ -41,31 +44,20 @@ class SaveModelCallback():
         precision = Metrics[0]
         recall = Metrics[1]
         f1 = Metrics[2]
+        auc = Metrics[3]
 
         if latest_val_log[f1] > self.now_best_val_log[f1]:
 
-            if latest_val_log[f1] > self.now_best_val_log[f1]:
-                self.now_best_val_log[f1] = latest_val_log[f1]
-
-            if latest_val_log[precision] > self.now_best_val_log[precision]:
-                self.now_best_val_log[precision] = latest_val_log[precision]
-
-            if latest_val_log[recall] > self.now_best_val_log[recall]:
-                self.now_best_val_log[recall] = latest_val_log[recall]
+            for mc in Metrics:
+                if latest_val_log[mc] > self.now_best_val_log[mc]:
+                    self.now_best_val_log[mc] = latest_val_log[mc]
 
             return True
         else:
 
-
-            if latest_val_log[f1] > self.now_best_val_log[f1]:
-                self.now_best_val_log[f1] = latest_val_log[f1]
-
-            if latest_val_log[precision] > self.now_best_val_log[precision]:
-                self.now_best_val_log[precision] = latest_val_log[precision]
-
-            if latest_val_log[recall] > self.now_best_val_log[recall]:
-                self.now_best_val_log[recall] = latest_val_log[recall]
-
+            for mc in Metrics:
+                if latest_val_log[mc] > self.now_best_val_log[mc]:
+                    self.now_best_val_log[mc] = latest_val_log[mc]
 
             return False
 
@@ -128,7 +120,7 @@ class EvaluateMetrics():
         self.mode = mode
         self.args = args
 
-    def set_thre(self, thre):
+    def set_thre(self, thre=0.5):
         for metric in self.metrics:
             metric.threshold = thre
 
@@ -213,10 +205,6 @@ def f_first(group):
     group.loc[group['pred'] == -1000, 'pred'] = 1.0
     return group
 
-def f_th(group):
-    group.loc[group['pred'] >= th, 'pred' ] = 0.0
-    group.loc[group['pred'] < th, 'pred'] = 1.0
-    return group
 
 if __name__ == '__main__':
     eval_df = pd.DataFrame(data={

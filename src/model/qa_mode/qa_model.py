@@ -187,7 +187,7 @@ class QaModel():
             labels = []
             for i in batches_bar:
                 ''' 得到批次数据index '''
-                if self.args.always_save or self.args.data_type == 'marco':
+                if self.args.always_save:
                     index = epoch*self.args.batch_num_per_epoch + i
                 else:
                     index = i
