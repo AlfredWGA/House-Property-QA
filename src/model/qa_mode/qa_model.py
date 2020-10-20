@@ -7,7 +7,10 @@ import os.path as oph
 import torch
 import logging
 from dataset.qa_data.dataset import QaDataset
+from dataset.qa_data2.dataset import QaDataset2
+from dataset.qa_data3.dataset import QaDataset3
 from model.metrics.eval_callback import EvaluateMetrics, Metrics, SaveModelCallback
+# from model.metrics.eval_callback2 import EvaluateMetrics, Metrics, SaveModelCallback
 import numpy as np
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
@@ -61,6 +64,10 @@ class QaModel():
         ''' 根据模型和数据类型加载数据集 '''
         if args.data_type == 'qa_data':
             self.dataset = QaDataset(vocab_dir=bert_model_dir, args=args)
+        elif args.data_type == 'qa_data2':
+            self.dataset = QaDataset2(vocab_dir=bert_model_dir, args=args)
+        elif args.data_type == 'qa_data3':
+            self.dataset = QaDataset3(vocab_dir=bert_model_dir, args=args)
         else:
             RuntimeError('None model found !!')
         self.train_generator = self.dataset.train_generator
@@ -264,8 +271,6 @@ class QaModel():
                 self.test(epoch)
 
             epoch += 1
-            ''' 训练完毕回调 '''
-            self.train_generator.on_epoch_end_callback()
 
     def evaluate(self, epoch):
         self.qa_model.eval()

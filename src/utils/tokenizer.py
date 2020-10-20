@@ -18,9 +18,11 @@ def cut_sent(para):
 class Tokenizer():
     def __init__(self, vocab_dir=None):
         if vocab_dir is not None:
-            bert_tokenizer = BertTokenizer.from_pretrained(vocab_dir)
-            self.cutter = bert_tokenizer.tokenize
-            self.convert_tokens_to_ids = bert_tokenizer.convert_tokens_to_ids
+            self.bert_tokenizer = BertTokenizer.from_pretrained(vocab_dir)
+            self.cutter = self.bert_tokenizer.tokenize
+            self.convert_tokens_to_ids = self.bert_tokenizer.convert_tokens_to_ids
+            self.encode_plus = self.bert_tokenizer.encode_plus
+            self.pad_token_id = self.bert_tokenizer.pad_token_id
         else:
             self.cutter =  jieba.lcut
             self.convert_tokens_to_ids = None

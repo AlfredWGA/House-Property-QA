@@ -109,7 +109,6 @@ class EvaluateMetrics():
         self.log = log
         self.metrics = metric
         self._dev_x, self.dev_y = generator.get_all()
-        # self.dev_y = generator.get_all()
         self._valid_steps = once_every
         self.save_model_callback = save_model_callback
         self._verbose = verbose
@@ -119,27 +118,6 @@ class EvaluateMetrics():
     def set_thre(self, thre=0.5):
         for metric in self.metrics:
             metric.threshold = thre
-
-    def eval_metric_on_data_frame(
-        self,
-        metric: BaseMetric,
-        id_left: typing.Union[list, np.array],
-        y: typing.Union[list, np.array],
-        y_pred: typing.Union[list, np.array]
-    ):
-        eval_df = pd.DataFrame(data={
-            'id': id_left,
-            'true': y.squeeze(),
-            'pred': y_pred.squeeze()
-        })
-        assert isinstance(metric, BaseMetric)
-
-        eval_df['id'] = np.ones_like(eval_df['id'])
-
-        val = eval_df.groupby(by='id').apply(
-            lambda df: metric(df['true'].values, df['pred'].values)
-        ).mean()
-        return val
 
     def eval(self, epoch: int, pred = None, step = -1, summary_writer = None, mode = None):
         """
@@ -153,38 +131,10 @@ class EvaluateMetrics():
             val_logs = {}
             assert pred.shape[0] == self.dev_y.shape[0]
 
-            dev_x={
-                'id_left':list(self._dev_x['id_left']) ,
-                'id_right':list(self._dev_x['id_right']) ,
-                'label':list(self.dev_y),
-                'pred':list(np.squeeze(pred))
-            }
-            dev_data = pd.DataFrame(dev_x)
-
-            if self.mode == 'max':
-                dev_data = dev_data.iloc[dev_data.groupby(['id_left', 'id_right']).apply(lambda x:x['pred'].idxmax())]
-            elif self.mode == 'mean':
-                pred_mean = dev_data.groupby(['id_left', 'id_right'])['pred'].transform('mean')
-                del dev_data['pred']
-                dev_data['pred'] = pred_mean
-                dev_data = dev_data.iloc[dev_data.groupby(['id_left', 'id_right']).apply(lambda x: x['pred'].idxmax())]
-            else:
-                RuntimeError('Eval mode error!!')
-
-            x = {
-                'id_left': dev_data['id_left'].values,
-                'id_right': dev_data['id_right'].values,
-            }
-
-            y = dev_data['label'].values
-            y_pred = dev_data['pred'].values
-            # y = np.squeeze(self.dev_y)
-            # y_pred = np.squeeze(pred)
-            matchzoo_metrics = self.metrics
-            for metric in matchzoo_metrics:
-                val_logs[metric] = self.eval_metric_on_data_frame(metric, x['id_left'], y, y_pred)
-                # val_logs[metric] = metric(y, y_pred)
-
+            pred = np.squeeze(pred)
+            self.dev_y = np.squeeze(self.dev_y)
+            for metric in self.metrics:
+                val_logs[metric] = metric(self.dev_y, pred)
             if self._verbose:
                 self.log.debug('Validation: ' + ' - '.join(f'{k}: {v}' for k, v in val_logs.items()))
 

@@ -14,16 +14,18 @@ from tqdm import tqdm
 import tensorflow as tf
 import tensorflow.keras.backend as K
 import os
+# os.environ["CUDA_VISIBLE_DEVICES"] = "7"
 from transformers import *
 print(tf.__version__)
 from sklearn.metrics import f1_score
-
+from transformers.tokenization_utils_base import TruncationStrategy
+# from transformers.modeling_tf_bert import TFBertModel
 
 # # 参数下载地址 https://huggingface.co/bert-base-chinese
 
 # In[2]:
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+
 
 script_abs_path = os.path.dirname(__file__)
 ROOT_DIR = os.path.join(script_abs_path, '../../')
@@ -77,8 +79,7 @@ def _convert_to_transformer_inputs(question, answer, tokenizer, max_sequence_len
         inputs = tokenizer.encode_plus(str1, str2,
             add_special_tokens=True,
             max_length=length,
-            truncation_strategy=truncation_strategy,
-            truncation=True
+            truncation=truncation_strategy
             )
         
         input_ids =  inputs["input_ids"] 
@@ -93,7 +94,7 @@ def _convert_to_transformer_inputs(question, answer, tokenizer, max_sequence_len
         return [input_ids, input_masks, input_segments]
     
     input_ids_q, input_masks_q, input_segments_q = return_id(
-        question, answer, 'longest_first', max_sequence_length)
+        question, answer, 'longest_first' , max_sequence_length)
     
 
     
@@ -108,7 +109,11 @@ def compute_input_arrays(df, columns, tokenizer, max_sequence_length):
         q, a = instance.q1, instance.q2
 
         ids_q, masks_q, segments_q= _convert_to_transformer_inputs(q, a, tokenizer, max_sequence_length)
-        
+
+        assert len(ids_q) == max_sequence_length
+        assert len(masks_q) == max_sequence_length
+        assert len(segments_q) == max_sequence_length
+
         input_ids_q.append(ids_q)
         input_masks_q.append(masks_q)
         input_segments_q.append(segments_q)

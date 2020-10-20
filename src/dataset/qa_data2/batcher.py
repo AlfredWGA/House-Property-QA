@@ -94,22 +94,16 @@ class Batcher():
 
         return X, Y
 
-    ''' 得到query内容并分词 '''
+    ''' 得到query内容 '''
     def get_query(self, qid):
         q_str = self.query[qid]
-        q = self.tokenizer.cut(q_str)
-        if self.args.max_q_len != -1:
-            q = q[:self.args.max_q_len]
-        return q
+        return q_str
 
-    ''' 得到doc内容并分词和分段 '''
+    ''' 得到doc内容 '''
     def get_doc(self, did):
         d_str = self.doc[did]
-        d = self.tokenizer.cut(d_str)
-        if self.args.max_d_len != -1:
-            d = d[:self.args.max_d_len]
 
-        return [d]
+        return d_str
 
 
 

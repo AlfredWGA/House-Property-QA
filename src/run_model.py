@@ -6,16 +6,16 @@ from model.qa_mode.qa_model import QaModel
 from utils.set_random_seed import setup_seed
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,3,4"
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 ''' 定义参数和默认值 '''
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--machine', default='85', choices=['85', '86', '87'])
 parser.add_argument('--pretrain_bert_model', default='google', choices=['google'])
-parser.add_argument('--data_type', default='qa_data', choices=['qa_data'])
+parser.add_argument('--data_type', default='qa_data3', choices=['qa_data', 'qa_data2', 'qa_data3'])
 parser.add_argument('--model_name', default='bert_cls_model', choices=['bert_cls_model'])
 
-parser.add_argument('--exp_name', default='qa5')
+parser.add_argument('--exp_name', default='qa1')
 parser.add_argument('--run_mode', default='train', choices=['train', 'get_result'])
 
 
@@ -24,8 +24,8 @@ parser.add_argument('--freeze_layer', type=int, default=-1)
 parser.add_argument('--lr', type=float, default=2e-5)
 parser.add_argument('--seed', type=int, default=1234)
 
-parser.add_argument('--batch_size', type=int, default=16)
-parser.add_argument('--gpu_num', type=int, default=4)
+parser.add_argument('--batch_size', type=int, default=64)
+parser.add_argument('--gpu_num', type=int, default=1)
 parser.add_argument('--accumulation_loss_step', type=int, default=1)
 parser.add_argument('--batch_num_per_epoch', type=int, default=-1)
 parser.add_argument('--epoch_num', type=int, default=1000)
@@ -35,10 +35,10 @@ parser.add_argument('--class_num', type=int, default=1)
 
 parser.add_argument('--load_pretrain_model', type=bool, default=False)
 
-parser.add_argument('--max_seq_len', type=int, default=160)
-parser.add_argument('--max_q_len', type=int, default=100)
-parser.add_argument('--max_d_len', type=int, default=60)
-parser.add_argument('--max_para_num', type=int, default=20)
+parser.add_argument('--max_seq_len', type=int, default=100)
+parser.add_argument('--max_q_len', type=int, default=-1)
+parser.add_argument('--max_d_len', type=int, default=-1)
+parser.add_argument('--max_para_num', type=int, default=-1)
 parser.add_argument('--overlap', type=bool, default=False)
 
 parser.add_argument('--eval_train', type=bool, default=True)
