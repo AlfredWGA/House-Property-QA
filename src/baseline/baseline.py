@@ -202,28 +202,7 @@ def train_pytorch(**kwargs):
     
     gkf = GroupKFold(n_splits=5).split(X=df_train.q2, groups=df_train.id)
     
-    model = BertForHouseQA().cuda(device)
 
-    # List all modules inside the model.
-    logger.info('Model modules:')
-    for i, m in enumerate(model.named_children()):
-        logger.info('{} -> {}'.format(i, m))
-
-    # Get the number of total parameters.
-    total_params = sum(p.numel() for p in model.parameters())
-    trainable_params = sum(p.numel()
-                        for p in model.parameters() if p.requires_grad)
-
-    logger.info("Total params: {:,}".format(total_params))
-    logger.info("Trainable params: {:,}".format(trainable_params))
-
-    criterion = torch.nn.BCELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
-    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
-                                                        #    mode='min',
-                                                        #    patience=8,
-                                                        #    verbose=True
-                                                        #    )
 
     oof = np.zeros((len(df_train),1))
     for fold, (train_idx, valid_idx) in enumerate(gkf):
@@ -248,6 +227,29 @@ def train_pytorch(**kwargs):
 
         valid_loader = DataLoader(valid_set,
                                 batch_size=512)
+
+        model = BertForHouseQA().cuda(device)
+
+        # List all modules inside the model.
+        # logger.info('Model modules:')
+        # for i, m in enumerate(model.named_children()):
+        #     logger.info('{} -> {}'.format(i, m))
+
+        # # Get the number of total parameters.
+        # total_params = sum(p.numel() for p in model.parameters())
+        # trainable_params = sum(p.numel()
+        #                     for p in model.parameters() if p.requires_grad)
+
+        # logger.info("Total params: {:,}".format(total_params))
+        # logger.info("Trainable params: {:,}".format(trainable_params))
+
+        criterion = torch.nn.BCELoss()
+        optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
+        # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+        #                                                        mode='min',
+        #                                                        patience=8,
+        #                                                        verbose=True
+        #                                                        )
 
         for epoch in range(kwargs['epoch']):
             # =======================Training===========================
