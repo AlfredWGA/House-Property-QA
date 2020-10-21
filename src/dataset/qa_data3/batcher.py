@@ -6,6 +6,7 @@ import os
 import csv
 import gzip
 import json
+from sklearn.model_selection import KFold
 
 from sklearn.model_selection import train_test_split
 logging.basicConfig(level=logging.DEBUG)
@@ -33,13 +34,27 @@ test_reply_file = os.path.join(RAW_DATA, 'test', 'test.reply.tsv')
 
 class Batcher():
     def __init__(self, dataset_name, tokenizer, args):
+
+        self.dataset_name = dataset_name
+        self.fold_num = 5
+
         self.args = args
         self.tokenizer = tokenizer
+        self.total_sample_num = 0
+        self.total_sample_label = None
+        self.total_sample_list = []
+
+        self.train_set_list = []
+        self.test_set_list = []
+        self.kf = KFold(n_splits=self.fold_num, random_state=args.seed)
+
+
 
         ''' 得到 qd_pairs_id '''
         self.instances = []
         self.max_seq_len = args.max_seq_len
         self.batches = []
+
 
         if not dataset_name == 'dev':
             train_left = pd.read_csv(train_query_file, sep='\t', header=None)
@@ -49,21 +64,20 @@ class Batcher():
             self.df_train = train_left.merge(train_right, how='left')  # 得到训练数据
             self.df_train['q2'] = self.df_train['q2'].fillna('NaN')
 
-            instances = []
             for _, instance in tqdm(self.df_train[['q1', 'q2', 'label', 'id', 'id_sub']].iterrows()):
                 qid, did, q, a, label = instance.id, instance.id_sub ,instance.q1, instance.q2, instance.label
                 ids, masks, segments = self._convert_to_transformer_inputs(q, a, self.max_seq_len)
                 assert len(ids) ==  self.max_seq_len
                 assert len(masks) ==  self.max_seq_len
                 assert len(segments) ==  self.max_seq_len
-                instances.append((ids, masks, segments, qid, did, label))
+                self.total_sample_list.append((ids, masks, segments, qid, did, label))
 
-            train_set, test_set = train_test_split(instances, test_size=0.2, random_state=42)
+            self.total_sample_num = len(self.total_sample_list)
+            _, _, _, _, _, self.total_sample_label = zip(*self.total_sample_list)
 
-            if dataset_name == 'train':
-                self.instances = train_set
-            else:
-                self.instances = test_set
+            self.get_k_fold_set()
+            self.set_fold(0)
+
         else:
             test_left = pd.read_csv(test_query_file, sep='\t', header=None, encoding='gbk')
             test_left.columns = ['id', 'q1']
@@ -77,8 +91,41 @@ class Batcher():
                 assert len(masks) ==  self.max_seq_len
                 assert len(segments) ==  self.max_seq_len
                 self.instances.append((ids, masks, segments, qid, did, 1))
+            self.total_sample_num = len(self.instances)
+
+            self.batches = self.get_batches()
+
+
+    def get_k_fold_set(self):
+        for train_index, test_index in self.kf.split(self.total_sample_list):
+            self.train_set_list.append(train_index)
+            self.test_set_list.append(test_index)
+
+        tmp = []
+        for indexes in self.test_set_list:
+            tmp.extend(indexes)
+        assert len(set(tmp)) == len(self.total_sample_list)
+
+
+    ''' 设置使用第一fold的训练和数据集 '''
+    def set_fold(self, fold_no):
+        train_data = []
+        test_data = []
+        for i, inst in enumerate(self.total_sample_list):
+            if i in self.train_set_list[fold_no]:
+                train_data.append(inst)
+            elif i in self.test_set_list[fold_no]:
+                test_data.append(inst)
+        if self.dataset_name == 'train':
+            self.instances = train_data
+        elif self.dataset_name == 'test':
+            self.instances = test_data
+        else:
+            RuntimeError('Invalid dataset name !!')
 
         self.batches = self.get_batches()
+
+
 
     ''' 得到该批数据所有的 label '''
     def get_all(self):

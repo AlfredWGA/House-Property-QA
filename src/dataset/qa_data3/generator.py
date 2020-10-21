@@ -109,6 +109,8 @@ class TrainDataGenerator():
                                args=args,
                                tokenizer=tokenizer)
 
+    def set_fold(self, fold_no):
+        self.batcher.set_fold(fold_no)
 
     def __getitem__(self, item: int):
 
@@ -144,6 +146,8 @@ class DevTestGenerator():
                                args=args,
                                tokenizer=tokenizer)
 
+    def set_fold(self, fold_no):
+        self.batcher.set_fold(fold_no)
 
     def __getitem__(self, item: int):
 

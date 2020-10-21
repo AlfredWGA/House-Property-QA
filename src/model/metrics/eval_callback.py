@@ -38,6 +38,12 @@ class SaveModelCallback():
         if not os.path.exists(self.save_model_path):
             os.makedirs(self.save_model_path)
 
+    def reset_val_log(self):
+        self.now_best_val_log =  {m: 0.0 for m in Metrics}
+
+    def set_save_path(self, save_model_path):
+        self.save_model_path = save_model_path
+
     def is_better(self, latest_val_log):
         precision = Metrics[0]
         recall = Metrics[1]
@@ -106,6 +112,7 @@ class EvaluateMetrics():
         log = None
     ):
         """Initializer."""
+        self.generator = generator
         self.log = log
         self.metrics = metric
         self._dev_x, self.dev_y = generator.get_all()
@@ -150,6 +157,8 @@ class EvaluateMetrics():
         :return: dictionary of logs.
         """
         if (epoch + 1) % self._valid_steps == 0:
+            self._dev_x, self.dev_y = self.generator.get_all()
+
             val_logs = {}
             assert pred.shape[0] == self.dev_y.shape[0]
 

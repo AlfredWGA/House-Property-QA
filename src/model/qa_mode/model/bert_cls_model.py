@@ -5,10 +5,12 @@ from torch.nn import  MSELoss, CrossEntropyLoss, BCELoss
 from transformers import BertModel, BertConfig
 import torch.nn.functional as F
 import torch
+import os
 
 class BertCLSModel(nn.Module):
     def __init__(self, bert_model_dir, args):
         super(BertCLSModel, self).__init__()
+        self.bert_model_dir = bert_model_dir
         self.config = BertConfig.from_pretrained(bert_model_dir)
         self.config.output_hidden_states = False
         self.config.output_attentions = False
@@ -18,6 +20,10 @@ class BertCLSModel(nn.Module):
         self.class_num = args.class_num
         self.sigmod = nn.Sigmoid()
 
+
+    def reset_param(self):
+        self.bert = BertModel.from_pretrained(self.bert_model_dir).to('cuda')
+        self.fc1.reset_parameters()
 
 
     def forward(self, batch_data):
