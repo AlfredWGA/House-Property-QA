@@ -26,10 +26,10 @@ class QaModel():
                  args):
 
         ''' 创建log文件夹 '''
-        self.log_file = oph.join(save_model_path, 'log.txt')
+        self.log_file = oph.join(save_model_path, 'log%s.txt' % args.my_name)
 
         ''' 创建summary对象 '''
-        summary_dir = oph.join(save_model_path, 'summary')
+        summary_dir = oph.join(save_model_path, 'summary%s' % args.my_name)
         self.summary_writer = SummaryWriter(summary_dir)
 
         ''' 创建checkpoint文件夹 '''
@@ -172,17 +172,20 @@ class QaModel():
 
     ''' k-fold 训练'''
     def train_k_fold(self, num_epoch=20, fold_num=5):
-        init_path = os.path.join(self.model_save_path, 'init')
+        ''' 保存初始参数 '''
+        init_path = os.path.join(self.model_save_path, self.args.my_name, 'init')
         if not os.path.exists(init_path):
             os.makedirs(init_path)
             self.log.info("Saving init param to %s" % os.path.join(init_path, 'ckpt.pth'))
             torch.save(self.qa_model.state_dict(), os.path.join(init_path, 'ckpt.pth'))
+
+        ''' k fold 训练 '''
         for fold_no in range(fold_num):
             ckpt = torch.load(os.path.join(init_path, 'ckpt.pth'))
-            self.qa_model.load_state_dict(ckpt)
-            self.train_generator.set_fold(fold_no)
-            self.test_generator.set_fold(fold_no)
-            self.test_fun.save_model_callback.reset_val_log()
+            self.qa_model.load_state_dict(ckpt) # 重新加载参数
+            self.train_generator.set_fold(fold_no) # 得到新的 fold
+            self.test_generator.set_fold(fold_no) # 得到新的 fold
+            self.test_fun.save_model_callback.reset_val_log() # 重置指标
             self.log.info('\n\nFold: %d Training:----------------------------------------------------------' % fold_no)
             for epoch in range(num_epoch):
                 self.log.info('\nEpoch: %d Training:---------------------------------------------------------' % epoch)
@@ -232,80 +235,134 @@ class QaModel():
 
                 ''' 对测试数据进行评估 '''
                 self.log.info('Epoch: %d Testing-------------------------------------------------------------------------' % epoch)
-                path = os.path.join(self.model_save_path, 'fold_%d' % fold_no)
+                path = os.path.join(self.model_save_path, self.args.my_name, 'fold_%d' % fold_no)
                 self.test_fun.save_model_callback.set_save_path(path)
                 self.test(epoch)
+                # time.sleep(10)
 
-    def get_best_result(self):
+                ''' 融合兄弟模型参数 '''
+                if self.args.bro_name != '':
+                    my_ckpt_path = os.path.join(self.model_save_path, self.args.my_name,
+                                                   'fold_%d/%d'%(fold_no, epoch), 'ckpt.pth')
+                    self.log.info('Loading my ckpt %s ...' % my_ckpt_path)
+                    my_ckpt = torch.load(my_ckpt_path)
+
+                    bro_ckpt_path = os.path.join(self.model_save_path, self.args.bro_name,
+                                            'fold_%d/%d'%(fold_no, epoch), 'ckpt.pth')
+                    while not os.path.exists(bro_ckpt_path):
+                        self.log.info('Waiting for brother ckpt.pth for 5s ...')
+                        time.sleep(5)
+                    self.log.info('Loading bro ckpt %s after 10s ...' % bro_ckpt_path)
+                    time.sleep(10)
+
+                    bro_ckpt = torch.load(bro_ckpt_path)
+                    bro_state_dict = bro_ckpt['model_state_dict']
+                    my_state_dict = my_ckpt['model_state_dict']
+
+                    model_state_dict = {}
+                    for my, bro in zip(my_state_dict.items(), bro_state_dict.items()):
+                        assert my[0] == bro[0]
+                        my_para = my[1]
+                        bro_para = bro[1]
+                        model_state_dict[my[0]] = 0.5*my_para + 0.5*bro_para
+                    self.qa_model.load_state_dict(model_state_dict)
+
+    ''' 得到最好的epoch所在的路径 '''
+    def get_best_result_epoch(self, path):
+        max_epoch = 0
+        model_path = ''
+        for root, dirs, files in os.walk(path):
+            for d in dirs:
+                epoch_num = int(d)
+                if epoch_num >= max_epoch:
+                    model_path = os.path.join(root, d, 'ckpt.pth')
+                    if os.path.exists(model_path):
+                        max_epoch = epoch_num
+                        model_path = os.path.join(root, d, 'ckpt.pth')
+        self.log.debug('Load %s ' % model_path)
+        return model_path
+
+    ''' 得到整个数据集指标，并保存评估数据集结果 '''
+    def get_best_result(self, epochs=None):
         test_results = np.zeros((self.test_generator.batcher.total_sample_num, )) # [total_num, ] # 测试结果
         test_labels = np.array(self.test_generator.batcher.total_sample_label)  # [total_num, ] # 测试标签
         final_result_list = [] # 上传结果
         for fold in range(5):
-            final_result = []
-            test_part_res = []
-            self.log.debug('Loading best ckpt in fold: %d ------------------------- ' % fold)
-            max_epoch = 0
-            model_path = ''
-            '''加载最新的，即epoch标号最大的模型'''
-            path = os.path.join(self.model_save_path, 'fold_%d'%fold)
-            for root, dirs, files in os.walk(path):
-                for d in dirs:
-                    epoch_num = int(d)
-                    if epoch_num >= max_epoch:
-                        model_path = os.path.join(root, d, 'ckpt.pth')
-                        if os.path.exists(model_path):
-                            max_epoch = epoch_num
-                            model_path = os.path.join(root, d, 'ckpt.pth')
-            self.log.debug('Load %s ' % model_path)
+            final_result = [] # 评估数据指标
+            test_part_res = [] #  部分测试数据指标
+
+            '''加载最好的，即epoch标号最大的模型'''
+            self.log.info('Loading best ckpt in fold: %d ------------------------- ' % fold)
+            path = os.path.join(self.model_save_path, self.args.my_name , 'fold_%d'%fold)
+            if epochs:
+                model_path = os.path.join(path, epochs[fold], 'ckpt.pth')
+            else:
+                model_path = self.get_best_result_epoch(path)
+            self.log.info('Loading ckpt %s' % model_path)
             checkpoint = torch.load(model_path)
             self.qa_model.load_state_dict(checkpoint['model_state_dict'])
+
+            ''' 得到一fold 测试数据 '''
             self.test_generator.set_fold(fold)
             test_index = self.test_generator.batcher.test_set_list[fold].tolist()
-            for batch_data, rep_num in tqdm(self.test_generator):
-                ''' 将数据导入 GPU'''
-                batch_data_cuda = []
-                for data in batch_data:
-                    batch_data_cuda.append(data.to('cuda'))
-                batch_data_cuda = tuple(batch_data_cuda)
 
-                ''' 预测结果 '''
-                out = self.qa_model(batch_data_cuda)[1]
-                bz = out.size(0)
-                out = out[:int(bz * rep_num)]
-                out = out.cpu().detach().numpy()
-                test_part_res.append(out)
-            test_part_res = np.concatenate(test_part_res, axis=0)
-            test_results[test_index] = np.squeeze(test_part_res)
+            self.qa_model.eval()
+            with torch.no_grad():
+                ''' 测试一fold数据 '''
+                for batch_data, rep_num in tqdm(self.test_generator):
+                    ''' 将数据导入 GPU'''
+                    batch_data_cuda = []
+                    for data in batch_data:
+                        batch_data_cuda.append(data.to('cuda'))
+                    batch_data_cuda = tuple(batch_data_cuda)
 
-            for batch_data, rep_num in tqdm(self.dev_generator):
-                ''' 将数据导入 GPU'''
-                batch_data_cuda = []
-                for data in batch_data:
-                    batch_data_cuda.append(data.to('cuda'))
-                batch_data_cuda = tuple(batch_data_cuda)
+                    ''' 预测结果 '''
+                    out = self.qa_model(batch_data_cuda)[1]
+                    bz = out.size(0)
+                    out = out[:int(bz * rep_num)]
+                    out = out.cpu().detach().numpy()
+                    test_part_res.append(out)
+                test_part_res = np.concatenate(test_part_res, axis=0)
+                ''' 评估本次结果 '''
+                self.test_fun.save_model_callback = None
+                self.test_fun.eval(epoch=0, pred=test_part_res, step=0, summary_writer=None, mode='test')
 
-                ''' 预测结果 '''
-                out = self.qa_model(batch_data_cuda)[1]
-                bz = out.size(0)
-                out = out[:int(bz * rep_num)]
-                out = out.cpu().detach().numpy()
-                final_result.append(out)
-            final_result = np.concatenate(final_result, axis=0)
-            final_result_list.append(final_result)
+                test_results[test_index] = np.squeeze(test_part_res)
 
+
+                ''' 测试评估数据集 '''
+                for batch_data, rep_num in tqdm(self.dev_generator):
+                    ''' 将数据导入 GPU'''
+                    batch_data_cuda = []
+                    for data in batch_data:
+                        batch_data_cuda.append(data.to('cuda'))
+                    batch_data_cuda = tuple(batch_data_cuda)
+
+                    ''' 预测结果 '''
+                    out = self.qa_model(batch_data_cuda)[1]
+                    bz = out.size(0)
+                    out = out[:int(bz * rep_num)]
+                    out = out.cpu().detach().numpy()
+                    final_result.append(out)
+                final_result = np.concatenate(final_result, axis=0)
+                final_result_list.append(final_result)
+
+        ''' 得到整个数据集上的指标 '''
+        assert not any(test_results == 0)
         total_f1, best_thre = self.search_f1(test_labels, test_results)
         logging.info('Total f1 %f, best thre %f' % (total_f1, best_thre))
+
+        ''' 得到评估数据集的结果，并保存到本地 '''
         final_result_list = np.concatenate(final_result_list, axis=-1)
         final_result_list = np.mean(final_result_list, axis=-1)
         final_result_list = final_result_list > best_thre
-        submission_file = os.path.join(self.model_save_path, 'submission_beike_{}.csv'.format(total_f1))
+        submission_file = os.path.join(self.model_save_path, self.args.my_name,'submission_beike_{}.csv'.format(total_f1))
         self.dev_generator.batcher.df_test['label'] = final_result_list.astype(int)
         self.dev_generator.batcher.df_test[['id', 'id_sub', 'label']].to_csv(submission_file, index=False, header=None, sep='\t')
 
-
     def search_f1(self, y_true, y_pred):
         best = 0
-        best_t = 0
+        best_t = 0.0
         for i in range(30, 60):
             tres = i / 100
             y_pred_bin = (y_pred > tres).astype(int)
@@ -313,27 +370,14 @@ class QaModel():
             if score > best:
                 best = score
                 best_t = tres
+
+        # y_pred[y_pred >= best_t] = 1.0
+        # y_pred[y_pred < best_t] = 0.0
+        # best = f1_score(y_true, y_pred)
+
         self.log.info('best %f' % best)
         self.log.info('thres %f' % best_t)
         return best, best_t
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     ''' 训练循环 '''
     def train_loop(self, num_epoch=100):
@@ -488,9 +532,9 @@ class QaModel():
 
     def show_weight(self):
         print('----------------------------------------------------')
-        dict_name = list(self.qa_model.state_dict())
+        dict_name = self.qa_model.state_dict().keys()
         for i,p in enumerate(dict_name):
-            print(i, p)
+            print(i,' ', p)
         print('----------------------------------------------------')
 
 

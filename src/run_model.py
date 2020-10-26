@@ -6,23 +6,28 @@ from model.qa_mode.qa_model import QaModel
 from utils.set_random_seed import setup_seed
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 ''' 定义参数和默认值 '''
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--machine', default='85', choices=['85', '86', '87'])
-parser.add_argument('--pretrain_bert_model', default='google', choices=['google'])
+parser.add_argument('--pretrain_bert_model', default='chinese-roberta-wwm-ext', choices=['google', 'chinese-roberta-wwm-ext'])
 parser.add_argument('--data_type', default='qa_data3', choices=['qa_data', 'qa_data2', 'qa_data3'])
 parser.add_argument('--model_name', default='bert_cls_model', choices=['bert_cls_model'])
 
-parser.add_argument('--exp_name', default='qa1')
-parser.add_argument('--run_mode', default='get_result', choices=['train', 'get_result', 'train_k_fold', 'get_result'])
+parser.add_argument('--exp_name', default='test')
+parser.add_argument('--run_mode', default='train', choices=['train', 'get_result', 'train_k_fold',
+                                                                    'show_weight'])
+parser.add_argument('--my_name', default='')
+parser.add_argument('--bro_name', default='')
 
+parser.add_argument('--seed', type=int, default=1234)
+parser.add_argument('--lr', type=float, default=2e-5)
 
 parser.add_argument('--freeze', type=bool, default=False)
 parser.add_argument('--freeze_layer', type=int, default=-1)
-parser.add_argument('--lr', type=float, default=2e-5)
-parser.add_argument('--seed', type=int, default=1234)
+
+
 
 parser.add_argument('--batch_size', type=int, default=64)
 parser.add_argument('--gpu_num', type=int, default=1)
@@ -31,7 +36,7 @@ parser.add_argument('--batch_num_per_epoch', type=int, default=-1)
 parser.add_argument('--epoch_num', type=int, default=20)
 parser.add_argument('--min_bz_per_gpu', type=int, default=1)
 
-parser.add_argument('--class_num', type=int, default=1)
+parser.add_argument('--class_num', type=int, default=2)
 
 parser.add_argument('--load_pretrain_model', type=bool, default=False)
 
@@ -87,8 +92,10 @@ BERT_PRETRAIN_MODEL_DIR = os.path.join(DATA_DIR, 'pretrain_model')
 
 ''' 定义BERT预训练数据目录 '''
 if args.pretrain_bert_model == 'google':
-    # BERT_PRETRAIN_MODEL = os.path.join(BERT_PRETRAIN_MODEL_DIR, 'bert-base-chinese')
-    BERT_PRETRAIN_MODEL = 'bert-base-chinese'
+    BERT_PRETRAIN_MODEL = os.path.join(BERT_PRETRAIN_MODEL_DIR, 'bert-base-chinese')
+    # BERT_PRETRAIN_MODEL = 'bert-base-chinese'
+elif args.pretrain_bert_model == 'chinese-roberta-wwm-ext':
+    BERT_PRETRAIN_MODEL = os.path.join(BERT_PRETRAIN_MODEL_DIR, 'chinese-roberta-wwm-ext')
 else:
     BERT_PRETRAIN_MODEL = None
     RuntimeError('None pretrain model specific !!')
@@ -108,8 +115,9 @@ if __name__ == '__main__':
         bert_for_ir.show_weight()
     elif args.run_mode == 'train_k_fold':
         bert_for_ir.train_k_fold(args.epoch_num)
+        # bert_for_ir.get_best_result(epochs=None)
     elif args.run_mode == 'get_result':
-        bert_for_ir.get_best_result()
+        bert_for_ir.get_best_result(epochs=None)
     else:
         RuntimeError('No run mode found !!')
 

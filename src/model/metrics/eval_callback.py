@@ -35,6 +35,7 @@ class SaveModelCallback():
         self.optimizer = optimizer
         self.save_model_path = save_model_path
         self.now_best_val_log = {m: 0.0 for m in Metrics}
+        self.now_best_epoch = 0
         if not os.path.exists(self.save_model_path):
             os.makedirs(self.save_model_path)
 
@@ -69,6 +70,7 @@ class SaveModelCallback():
 
         if not self.always_save:
             if self.is_better(latest_val_log=val_logs):
+                self.now_best_epoch = epoch
                 file_path = os.path.join(self.save_model_path, str(epoch))
                 self.log.debug('NEW Best!! Save model ckpt to %s' % file_path)
                 if not os.path.exists(file_path):
@@ -82,8 +84,13 @@ class SaveModelCallback():
                     }, file)
                 else:
                     RuntimeError('Model file has exist!')
-            self.log.debug('So far best: ' + ' - '.join(f'{k}: {v}' for k, v in self.now_best_val_log.items()))
+            self.log.debug('So far best: '
+                           + ' - '.join(f'{k}: {v}' for k, v in self.now_best_val_log.items())
+                           + ' at epoch %d' % self.now_best_epoch)
         else:
+            if self.is_better(latest_val_log=val_logs):
+                self.log.info('Get new best model at epoch %d !!! ' % epoch)
+                self.now_best_epoch = epoch
             file_path = os.path.join(self.save_model_path, str(epoch))
             self.log.debug('Save model ckpt to %s' % file_path)
             if not os.path.exists(file_path):
@@ -97,6 +104,10 @@ class SaveModelCallback():
                 }, file)
             else:
                 RuntimeError('Model file has exist!')
+
+            self.log.debug('So far best: '
+                           + ' - '.join(f'{k}: {v}' for k, v in self.now_best_val_log.items())
+                           + ' at epoch %d' % self.now_best_epoch)
 
 class EvaluateMetrics():
 

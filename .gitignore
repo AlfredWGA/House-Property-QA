@@ -131,3 +131,5 @@ dmypy.json
 model_record
 .idea
 pretrain_model
+ZhihuRank
+ZhihuRank.tar.gz
