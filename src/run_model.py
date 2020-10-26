@@ -11,6 +11,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "5"
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--machine', default='85', choices=['85', '86', '87'])
+
 parser.add_argument('--pretrain_bert_model', default='chinese-roberta-wwm-ext', choices=['google', 'chinese-roberta-wwm-ext'])
 parser.add_argument('--data_type', default='qa_data3', choices=['qa_data', 'qa_data2', 'qa_data3'])
 parser.add_argument('--model_name', default='bert_cls_model', choices=['bert_cls_model'])
@@ -20,6 +21,8 @@ parser.add_argument('--run_mode', default='train', choices=['train', 'get_result
                                                                     'show_weight'])
 parser.add_argument('--my_name', default='')
 parser.add_argument('--bro_name', default='')
+
+
 
 parser.add_argument('--seed', type=int, default=1234)
 parser.add_argument('--lr', type=float, default=2e-5)
@@ -46,9 +49,9 @@ parser.add_argument('--max_d_len', type=int, default=-1)
 parser.add_argument('--max_para_num', type=int, default=-1)
 parser.add_argument('--overlap', type=bool, default=False)
 
-parser.add_argument('--eval_train', type=bool, default=True)
-parser.add_argument('--eval', type=bool, default=True)
-parser.add_argument('--have_val', type=bool, default=True)
+parser.add_argument('--eval_train', type=bool, default=True)    # 评估训练集
+parser.add_argument('--eval', type=bool, default=True)  # 评估验证集
+parser.add_argument('--have_val', type=bool, default=False)     # 需要输出submission时设为True
 parser.add_argument('--always_save', type=bool, default=False)
 
 parser.add_argument('--dropout', type=float, default=0.5)
