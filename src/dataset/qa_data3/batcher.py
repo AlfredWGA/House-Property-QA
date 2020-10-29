@@ -30,6 +30,9 @@ RAW_DATA = os.path.join(DATA_DIR, 'raw_data')
 train_query_file = os.path.join(RAW_DATA, 'train', 'train.query.tsv')
 train_reply_file = os.path.join(RAW_DATA, 'train', 'train.reply.tsv')
 
+train_query_bt_file = os.path.join(RAW_DATA, 'train', 'train.query.bt.tsv')
+train_reply_bt_file = os.path.join(RAW_DATA, 'train', 'train.reply.bt.tsv')
+
 test_query_file = os.path.join(RAW_DATA, 'test', 'test.query.tsv')
 test_reply_file = os.path.join(RAW_DATA, 'test', 'test.reply.tsv')
 
@@ -45,13 +48,16 @@ class Batcher():
         self.args = args
         self.tokenizer = tokenizer
         self.total_sample_num = 0
-        self.total_sample_label = None
+        self.total_sample_label = []
         self.total_sample_list = []
+
+        self.total_sample_bt_list = []
+        self.total_sample_bt_label = []
 
         self.train_set_list = []
         self.test_set_list = []
-        self.kf = KFold(n_splits=self.fold_num, shuffle=False)
 
+        self.kf = KFold(n_splits=self.fold_num, shuffle=True, random_state=args.seed)
 
         ''' 得到 qd_pairs_id '''
         self.instances = []
@@ -62,36 +68,56 @@ class Batcher():
         if not dataset_name == 'dev':
             if not os.path.exists(os.path.join(preprocessed_data_dir, 'train_sample_list.pkl')):
 
-                train_left = pd.read_csv(train_query_file, sep='\t', header=None)
-                train_left.columns = ['id', 'q1']
-                train_right = pd.read_csv(train_reply_file, sep='\t', header=None)
-                train_right.columns = ['id', 'id_sub', 'q2', 'label']
+                train_left = pd.read_csv(train_query_bt_file, sep='\t', header=None)
+                train_left.columns = ['id', 'q1', 'bt1']
+                train_right = pd.read_csv(train_reply_bt_file, sep='\t', header=None)
+                train_right.columns = ['id', 'id_sub', 'q2', 'label', 'bt2']
                 self.df_train = train_left.merge(train_right, how='left')  # 得到训练数据
                 self.df_train['q2'] = self.df_train['q2'].fillna('你好')
 
 
-                for _, instance in tqdm(self.df_train[['q1', 'q2', 'label', 'id', 'id_sub']].iterrows()):
+                for _, instance in tqdm(self.df_train[['q1', 'q2', 'label', 'id', 'id_sub', 'bt1', 'bt2']].iterrows()):
                     qid, did, q, a, label = instance.id, instance.id_sub ,instance.q1, instance.q2, instance.label
+                    q_bt = instance.bt1
+                    a_bt = instance.bt2
                     ids, masks, segments = self._convert_to_transformer_inputs(q, a, self.max_seq_len)
+
                     assert len(ids) ==  self.max_seq_len
                     assert len(masks) ==  self.max_seq_len
                     assert len(segments) ==  self.max_seq_len
                     self.total_sample_list.append((ids, masks, segments, qid, did, label))
 
+                    ids_bt, masks_bt, segments_bt = self._convert_to_transformer_inputs(q_bt, a_bt, self.max_seq_len)
+
+                    assert len(ids_bt) ==  self.max_seq_len
+                    assert len(masks_bt) ==  self.max_seq_len
+                    assert len(segments_bt) ==  self.max_seq_len
+                    self.total_sample_bt_list.append((ids_bt, masks_bt, segments_bt, qid, did, label))
+
+
+
                 with open(os.path.join(preprocessed_data_dir, 'train_sample_list.pkl'), 'wb') as f:
                     pickle.dump(self.total_sample_list ,f)
+                with open(os.path.join(preprocessed_data_dir, 'train_sample_bt_list.pkl'), 'wb') as f:
+                    pickle.dump(self.total_sample_bt_list ,f)
                 with open(os.path.join(preprocessed_data_dir, 'df_train.pkl'), 'wb') as f:
                     pickle.dump(self.df_train, f)
 
             else:
                 with open(os.path.join(preprocessed_data_dir, 'train_sample_list.pkl'), 'rb') as f:
                     self.total_sample_list = pickle.load(f)
+                with open(os.path.join(preprocessed_data_dir, 'train_sample_bt_list.pkl'), 'rb') as f:
+                    self.total_sample_bt_list  = pickle.load(f)
                 with open(os.path.join(preprocessed_data_dir, 'df_train.pkl'), 'rb') as f:
                     self.df_train = pickle.load(f)
 
 
             self.total_sample_num = len(self.total_sample_list)
+            assert self.total_sample_num == len(self.total_sample_bt_list)
             _, _, _, _, _, self.total_sample_label = zip(*self.total_sample_list)
+            _, _, _, _, _, self.total_sample_bt_label = zip(*self.total_sample_bt_list)
+
+
             self.get_k_fold_set()
             self.set_fold(0)
 
@@ -110,7 +136,6 @@ class Batcher():
                     assert len(masks) ==  self.max_seq_len
                     assert len(segments) ==  self.max_seq_len
                     self.instances.append((ids, masks, segments, qid, did, 1))
-
 
                 with open(os.path.join(preprocessed_data_dir, 'test_sample_list.pkl'), 'wb') as f:
                     pickle.dump(self.instances ,f)
@@ -138,17 +163,36 @@ class Batcher():
         assert len(set(tmp)) == len(self.total_sample_list)
 
 
+
     ''' 设置使用第一fold的训练和数据集 '''
     def set_fold(self, fold_no):
         train_data = []
         test_data = []
+
+        train_data_bt = []
+        test_data_bt = []
+
         for i, inst in enumerate(self.total_sample_list):
             if i in self.train_set_list[fold_no]:
                 train_data.append(inst)
             elif i in self.test_set_list[fold_no]:
                 test_data.append(inst)
+
+        for i, inst in enumerate(self.total_sample_bt_list):
+            if i in self.train_set_list[fold_no]:
+                train_data_bt.append(inst)
+            elif i in self.test_set_list[fold_no]:
+                test_data_bt.append(inst)
+
+
+
+
         if self.dataset_name == 'train':
             self.instances = train_data
+
+            if self.args.augument_data: # 加入增强数据
+                self.instances.extend(train_data_bt)
+
             if self.args.shuffle: # 对训练数据进行shuffle
                 self.instances = shuffle(self.instances, random_state=self.args.seed)
         elif self.dataset_name == 'test':

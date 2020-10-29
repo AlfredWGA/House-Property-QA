@@ -59,8 +59,8 @@ class BertCLSModel(nn.Module):
 
         class_encode = self.dropout(class_encode)
         logit = self.fc1(class_encode)
-        # pre = self.sigmod(logit)
-        out = (logit, logit)
+        pre = self.sigmod(logit)
+        out = (logit, pre)
 
         return out
 

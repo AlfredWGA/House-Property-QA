@@ -6,7 +6,8 @@ from model.qa_mode.qa_model import QaModel
 from utils.set_random_seed import setup_seed
 
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "5"
+os.environ["CUDA_VISIBLE_DEVICES"] = "7"
+
 ''' 定义参数和默认值 '''
 parser = argparse.ArgumentParser()
 
@@ -16,13 +17,14 @@ parser.add_argument('--pretrain_bert_model', default='chinese-roberta-wwm-ext', 
 parser.add_argument('--data_type', default='qa_data3', choices=['qa_data', 'qa_data2', 'qa_data3'])
 parser.add_argument('--model_name', default='bert_cls_model', choices=['bert_cls_model'])
 
-parser.add_argument('--exp_name', default='test')
-parser.add_argument('--run_mode', default='train', choices=['train', 'get_result', 'train_k_fold',
+parser.add_argument('--exp_name', default='qa_02')
+parser.add_argument('--run_mode', default='get_result', choices=['train', 'get_result', 'train_k_fold',
                                                                     'show_weight'])
 parser.add_argument('--my_name', default='')
 parser.add_argument('--bro_name', default='')
 
 
+parser.add_argument('--augument_data', default=False, type=bool)
 
 parser.add_argument('--seed', type=int, default=1234)
 parser.add_argument('--lr', type=float, default=2e-5)
@@ -39,7 +41,7 @@ parser.add_argument('--batch_num_per_epoch', type=int, default=-1)
 parser.add_argument('--epoch_num', type=int, default=20)
 parser.add_argument('--min_bz_per_gpu', type=int, default=1)
 
-parser.add_argument('--class_num', type=int, default=2)
+parser.add_argument('--class_num', type=int, default=1)
 
 parser.add_argument('--load_pretrain_model', type=bool, default=False)
 
@@ -51,7 +53,7 @@ parser.add_argument('--overlap', type=bool, default=False)
 
 parser.add_argument('--eval_train', type=bool, default=True)    # 评估训练集
 parser.add_argument('--eval', type=bool, default=True)  # 评估验证集
-parser.add_argument('--have_val', type=bool, default=False)     # 需要输出submission时设为True
+parser.add_argument('--have_val', type=bool, default=True)     # 需要输出submission时设为True
 parser.add_argument('--always_save', type=bool, default=False)
 
 parser.add_argument('--dropout', type=float, default=0.5)
@@ -63,7 +65,7 @@ parser.add_argument('--bert_hidden_size', type=int, default=768)
 
 
 parser.add_argument('--optimizer', default='adam')
-parser.add_argument('--shuffle', type=bool, default=False)
+parser.add_argument('--shuffle', type=bool, default=True)
 
 
 args = parser.parse_args()
@@ -99,6 +101,7 @@ if args.pretrain_bert_model == 'google':
     # BERT_PRETRAIN_MODEL = 'bert-base-chinese'
 elif args.pretrain_bert_model == 'chinese-roberta-wwm-ext':
     BERT_PRETRAIN_MODEL = os.path.join(BERT_PRETRAIN_MODEL_DIR, 'chinese-roberta-wwm-ext')
+    # BERT_PRETRAIN_MODEL = 'hfl/chinese-roberta-wwm-ext'
 else:
     BERT_PRETRAIN_MODEL = None
     RuntimeError('None pretrain model specific !!')
