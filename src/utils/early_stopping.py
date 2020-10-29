@@ -25,6 +25,7 @@ class EarlyStopping(object):
 
     def step(self, score):
         # No initial best score.
+        best_flag = False
         if self.best_score is None:
             self.best_score = score
 
@@ -38,4 +39,5 @@ class EarlyStopping(object):
             logger.info('A best score! Reset EarlyStopping counter.')
             self.best_score = score
             self.counter = 0
-        return self.stop_flag
+            best_flag = True
+        return self.stop_flag, best_flag
