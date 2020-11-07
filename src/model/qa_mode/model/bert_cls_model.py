@@ -23,10 +23,6 @@ class BertCLSModel(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
 
-    def reset_param(self):
-        self.bert = BertModel.from_pretrained(self.bert_model_dir).to('cuda')
-        self.fc1.reset_parameters()
-
     def attention(self, query_emb, key_embs, mask):
         mask = ((1-mask)*-10000).unsqueeze(-1) # [b, seq, 1]
         query_emb = query_emb.unsqueeze(1) # [b, 1, hid]

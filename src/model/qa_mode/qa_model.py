@@ -15,6 +15,7 @@ from tqdm import tqdm
 from tensorboardX import SummaryWriter
 import torch.nn as nn
 from .model.bert_cls_model import BertCLSModel
+from .model.bert_multi_hid_model import BertMultiHidModel
 import torch.optim as optim
 import time
 from sklearn.metrics import f1_score
@@ -62,7 +63,7 @@ class QaModel():
         logger.info('GPU num: %d' % (torch.cuda.device_count()))
 
         ''' 根据模型和数据类型加载数据集 '''
-        if args.data_type == 'qa_data3':
+        if 'qa_data3' in args.data_type:
             self.dataset = QaDataset3(vocab_dir=bert_model_dir, args=args)
         elif args.data_type == 'crmc':
             self.dataset = CRMCDataset(vocab_dir=bert_model_dir, args=args)
@@ -76,6 +77,8 @@ class QaModel():
         ''' 构建模型对象 '''
         if args.model_name == 'bert_cls_model':
             self.qa_model = BertCLSModel(bert_model_dir=bert_model_dir, args=args)
+        if args.model_name == 'bert_multi_hid_model':
+            self.qa_model = BertMultiHidModel(bert_model_dir=bert_model_dir, args=args)
         else:
             RuntimeError('None model found !!')
 
@@ -105,6 +108,7 @@ class QaModel():
         self.save_callback = SaveModelCallback(model=self.qa_model,
                                                optimizer=self.optimizer,
                                                save_model_path=checkpoint,
+                                               args=args,
                                                log=self.log, always_save=args.always_save)
 
         ''' 构建三个数据集的评估回调函数 '''
@@ -286,11 +290,11 @@ class QaModel():
         return model_path
 
     ''' 得到整个数据集指标，并保存评估数据集结果 '''
-    def get_best_result(self, epochs=None):
+    def get_best_result(self, epochs=None, fold_num=5):
         test_results = np.zeros((self.test_generator.batcher.total_sample_num, )) # [total_num, ] # 测试结果
         test_labels = np.array(self.test_generator.batcher.total_sample_label)  # [total_num, ] # 测试标签
         final_result_list = [] # 上传结果
-        for fold in range(5):
+        for fold in range(fold_num):
             final_result = [] # 评估数据指标
             test_part_res = [] #  部分测试数据指标
 

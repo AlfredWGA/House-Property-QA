@@ -1,12 +1,13 @@
 # coding=utf-8
-
+import sys
 import typing
 from matchzoo.engine.base_metric import BaseMetric
 import numpy as np
 import pandas as pd
-import matchzoo as mz
 import os
+
 import torch
+from .early_stopping import EarlyStopping
 
 from .f1 import F1
 from .percision import Precision
@@ -25,10 +26,12 @@ class SaveModelCallback():
         self,
         model,
         optimizer,
+        args,
         save_model_path = None,
         log = None,
         always_save = False
     ):
+
         self.always_save = always_save
         self.log = log
         self.model = model
@@ -36,6 +39,9 @@ class SaveModelCallback():
         self.save_model_path = save_model_path
         self.now_best_val_log = {m: 0.0 for m in Metrics}
         self.now_best_epoch = 0
+        self.args = args
+        self.early_stop = EarlyStopping(patience=args.patience, mode='max')
+
         if not os.path.exists(self.save_model_path):
             os.makedirs(self.save_model_path)
 
@@ -108,6 +114,12 @@ class SaveModelCallback():
             self.log.debug('So far best: '
                            + ' - '.join(f'{k}: {v}' for k, v in self.now_best_val_log.items())
                            + ' at epoch %d' % self.now_best_epoch)
+
+        if self.args.early_stop:
+            f1 = Metrics[2]
+            self.early_stop.step(val_logs[f1])
+
+
 
 class EvaluateMetrics():
 
@@ -215,6 +227,14 @@ class EvaluateMetrics():
 
             if self.save_model_callback:
                 self.save_model_callback(val_logs, epoch)
+
+
+
+
+
+
+
+
 
 
 def f_first(group):

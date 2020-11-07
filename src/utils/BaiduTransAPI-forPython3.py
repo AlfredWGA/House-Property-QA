@@ -69,8 +69,10 @@ def translate(q, fromLang='zh', toLang='en'):
     return res
 
 def back_translate(q):
-    q = translate(q, fromLang='zh', toLang='en')
-    q = translate(q, fromLang='en', toLang='zh')
+    q = translate(q, fromLang='zh', toLang='jp')
+    if q == None or q == '':
+        q = '好的'
+    q = translate(q, fromLang='jp', toLang='zh')
     return q
 
 
@@ -81,44 +83,42 @@ if __name__ == '__main__':
     # res = back_translate('总房款多少')
     # print(res)
 
-    train_left = pd.read_csv(train_query_file, sep='\t', header=None)
-    train_left.columns = ['id', 'q1']
-
-    # train_right = pd.read_csv(train_reply_file, sep='\t', header=None)
-    # train_right.columns = ['id', 'id_sub', 'q2', 'label']
-
-    train_query_btrans_file =  train_query_file.replace('.tsv', '.bt.tsv')
-
-    for _, instance in tqdm(train_left[['id', 'q1']].iterrows()):
-        q = instance.q1
-        id = instance.id
-        q_tran = back_translate(q)
-        print(q, ' ', q_tran)
-
-        with open(train_query_btrans_file, 'a') as f:
-            line = '\t'.join([str(id), str(q), str(q_tran)]) + '\n'
-            f.write(line)
-
-
-    # train_right = pd.read_csv(train_reply_file, sep='\t', header=None)
-    # train_right.columns = ['id', 'id_sub', 'q2', 'label']
-    # train_right['q2'] = train_right['q2'].fillna('你好')
+    # train_left = pd.read_csv(train_query_file, sep='\t', header=None)
+    # train_left.columns = ['id', 'q1']
     #
-    # train_reply_btrans_file =  train_reply_file.replace('.tsv', '.bt.tsv')
-    # q_bt = []
-    # for _, instance in tqdm(train_right[['id', 'id_sub', 'q2', 'label']].iterrows()):
-    #     label = instance.label
-    #     id_sub = instance.id_sub
+    #
+    # train_query_btrans_file =  train_query_file.replace('.tsv', '.bt.jp.tsv')
+    #
+    # for _, instance in tqdm(train_left[['id', 'q1']].iterrows()):
+    #     q = instance.q1
     #     id = instance.id
-    #     q = instance.q2
-    #     if q == None or q == '':
-    #         q = '你好'
     #     q_tran = back_translate(q)
-    #     # q_bt.append(q_tran)
     #     print(q, ' ', q_tran)
-    #     with open(train_reply_btrans_file, 'a') as f:
-    #         line = '\t'.join([str(id), str(id_sub), str(q), str(label), str(q_tran)]) + '\n'
+    #
+    #     with open(train_query_btrans_file, 'a') as f:
+    #         line = '\t'.join([str(id), str(q), str(q_tran)]) + '\n'
     #         f.write(line)
+
+
+    train_right = pd.read_csv(train_reply_file, sep='\t', header=None)
+    train_right.columns = ['id', 'id_sub', 'q2', 'label']
+    train_right['q2'] = train_right['q2'].fillna('你好')
+
+    train_reply_btrans_file =  train_reply_file.replace('.tsv', '.bt.jp.tsv')
+    q_bt = []
+    for _, instance in tqdm(train_right[['id', 'id_sub', 'q2', 'label']].iterrows()):
+        label = instance.label
+        id_sub = instance.id_sub
+        id = instance.id
+        q = instance.q2
+        if q == None or q == '':
+            q = '你好'
+        q_tran = back_translate(q)
+        # q_bt.append(q_tran)
+        print(q, ' ', q_tran)
+        with open(train_reply_btrans_file, 'a') as f:
+            line = '\t'.join([str(id), str(id_sub), str(q), str(label), str(q_tran)]) + '\n'
+            f.write(line)
 
 
 
