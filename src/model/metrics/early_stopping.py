@@ -20,8 +20,11 @@ class EarlyStopping(object):
         if self.counter >= self.patience:
             self.stop_flag = True
 
+
     def reset_counter(self):
         self.counter = 0
+        self.best_score = None
+        self.stop_flag = False
 
     def step(self, score):
         # No initial best score.

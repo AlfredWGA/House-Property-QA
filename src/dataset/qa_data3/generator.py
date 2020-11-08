@@ -1,7 +1,7 @@
 # coding=utf-8
 
 import os
-from .batcher import Batcher
+from .batcher import Batcher, Batcher2
 from queue import Queue
 from threading import Thread
 import threading
@@ -107,7 +107,7 @@ class TrainDataGenerator():
         self.max_d_len = self.args.max_d_len
         self.max_seq_len = self.args.max_seq_len
         self.max_para_num = self.args.max_para_num
-        self.batcher = Batcher(dataset_name=dataset_name,
+        self.batcher = Batcher2(dataset_name=dataset_name,
                                args=args,
                                tokenizer=tokenizer)
 
@@ -144,7 +144,7 @@ class DevTestGenerator():
         self.max_d_len = self.args.max_d_len
         self.max_seq_len = self.args.max_seq_len
         self.max_para_num = self.args.max_para_num
-        self.batcher = Batcher(dataset_name=dataset_name,
+        self.batcher = Batcher2(dataset_name=dataset_name,
                                args=args,
                                tokenizer=tokenizer)
 
