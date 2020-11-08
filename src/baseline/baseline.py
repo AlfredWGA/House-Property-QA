@@ -4,10 +4,6 @@
 from collections import defaultdict
 import logging
 import re
-from typing import Pattern
-from numpy.core.fromnumeric import alltrue
-from sklearn.utils import shuffle
-from transformers.file_utils import ModelOutput
 import time
 import pandas as pd
 import numpy as np
@@ -27,7 +23,7 @@ from house_dataset import HouseDataset
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import BertModel, BertTokenizer, TFBertModel, BertConfig
+from transformers import BertModel, BertTokenizer, BertConfig
 import random
 from early_stopping import EarlyStopping
 
@@ -37,6 +33,8 @@ from early_stopping import EarlyStopping
 # logger = logging.getLogger(__name__)
 # logger.setFormatter(formater)
 # logger.setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 assert torch.cuda.is_available()
 
@@ -89,30 +87,12 @@ MAX_SEQUENCE_LENGTH = 100
 MODEL_NAME = 'chinese_wwm_ext_pytorch'
 TIME_STR = time.strftime("%Y-%m-%d-%H:%M:%S", time.localtime()) 
 CHECKPOINT_PATH = DATA_PATH / f"model_record/{MODEL_NAME}/{TIME_STR}"
-if not CHECKPOINT_PATH.exists():
-    CHECKPOINT_PATH.mkdir(parents=True)
 PRETRAIN_MODEL_PATH = PROJECT_ROOT_PATH/'./data/pretrain_model'
 input_categories = ['q1','q2']
 output_categories = 'label'
 
 print('train shape =', df_train.shape)
 print('test shape =', df_test.shape)
-
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-formater = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-# Print logs to the terminal.
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(formater)
-# # Save logs to file.
-log_path = CHECKPOINT_PATH / 'train.log'
-file_handler = logging.FileHandler(filename=log_path, mode='w', encoding='utf-8')
-file_handler.setFormatter(formater)
-
-logger.addHandler(stream_handler)
-logger.addHandler(file_handler)
 
 
 # %%
@@ -221,6 +201,71 @@ else:
     test_inputs = np.load(test_inputs_path, allow_pickle=True)    
 
 
+# def prepare_data(part='train'):
+#     input_categories = ['q1','q2']
+#     output_categories = 'label'
+    
+#     tokenizer = BertTokenizer.from_pretrained(PRETRAIN_MODEL_PATH/MODEL_NAME/'vocab.txt')
+
+#     if part == 'train':
+#         inputs_path = RAW_DATA_PATH / './train/inputs.npy'
+#         outputs_path = RAW_DATA_PATH / './train/outputs.npy'
+
+#         train_left = pd.read_csv(RAW_DATA_PATH/'./train/train.query.tsv',sep='\t',header=None)
+#         train_left.columns=['id','q1']
+#         train_right = pd.read_csv(RAW_DATA_PATH/'./train/train.reply.tsv',sep='\t',header=None)
+#         train_right.columns=['id','id_sub','q2','label']
+#         df_train = train_left.merge(train_right, how='left')
+#         df_train['q2'] = df_train['q2'].fillna('好的')
+
+#         # df_train_ex = pd.read_csv(RAW_DATA_PATH/'./train/train_ex.tsv', sep='\t', header=None, names=['id', 'q1', 'id_sub', 'q2', 'label'])
+        
+#         # train_reply_bt = pd.read_csv(RAW_DATA_PATH/'./train/train.reply.bt.tsv', sep='\t',
+#                 # header=None, names=['id','id_sub', 'q2', 'label','q2_bt'])
+#         # train_reply_bt_pos = train_reply_bt[train_reply_bt['label'] == 1]
+#         # train_reply_bt_pos['q2'] = train_reply_bt_pos['q2_bt']
+#         # train_reply_bt_pos = train_reply_bt_pos.drop('q2_bt', axis='columns')
+
+#         logger.info(f'Train shape = {df_train.shape}')
+#         df = df_train
+
+#     elif part == 'test':
+#         inputs_path = RAW_DATA_PATH / './test/test_inputs.npy'
+#         outputs_path = None
+#         outputs = None
+
+#         test_left = pd.read_csv(RAW_DATA_PATH/'./test/test.query.tsv',sep='\t',header=None, encoding='gbk')
+#         test_left.columns = ['id','q1']
+#         test_right =  pd.read_csv(RAW_DATA_PATH/'./test/test.reply.tsv',sep='\t',header=None, encoding='gbk')
+#         test_right.columns=['id','id_sub','q2']
+#         df_test = test_left.merge(test_right, how='left')
+#         logger.info(f'Test shape = {df_test.shape}')
+#         df = df_test
+#     else:
+#         raise ValueError()
+
+#     if not inputs_path.exists():
+#         inputs = compute_input_arrays(
+#             df, input_categories, tokenizer, MAX_SEQUENCE_LENGTH
+#         )
+#         np.save(inputs_path, inputs)
+#     else:
+#         inputs = np.load(inputs_path, allow_pickle=True)
+
+#     if not outputs_path.exists() and part == 'train':
+#         outputs = compute_output_arrays(df, output_categories)
+#         np.save(outputs_path, outputs)
+#     else:
+#         outputs = np.load(outputs_path, allow_pickle=True)
+
+#     return inputs, outputs
+
+
+# # 保存处理好的数据集
+# train_inputs, train_outputs = prepare_data(part="train")
+# test_inputs, _ = prepare_data(part="test")
+
+
 # Pytorch版BERT模型
 class BertForHouseQA(nn.Module):
     def __init__(self):
@@ -267,9 +312,28 @@ class BertForHouseQA(nn.Module):
 
 
 def train_pytorch(**kwargs):
+    CHECKPOINT_PATH.mkdir(parents=True, exist_ok=True)
+
+    # 调用logging.basicConfig会给进程添加一个root logger，这样其他模块中logger的日志才会显示到console当中
+    # （子logger传到root logger，root logger通过他自带的StreamHandler输出）。
+    # 如果不调用logging.basicConfig，必须得每个子logger配置一个StreamHandler，很麻烦
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+    formater = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Print logs to the terminal.
+    # stream_handler = logging.StreamHandler()
+    # stream_handler.setFormatter(formater)
+    # # Save logs to file.
+    log_path = CHECKPOINT_PATH / 'train.log'
+    file_handler = logging.FileHandler(filename=log_path, mode='w', encoding='utf-8')
+    file_handler.setFormatter(formater)
+    
+    # logger.addHandler(stream_handler)
+    logger.addHandler(file_handler)
+    
     inputs = kwargs['inputs']
     outputs = kwargs['outputs']
-    test_inputs = kwargs['test_inputs']
+    # test_inputs = kwargs['test_inputs']
     
     gkf = GroupKFold(n_splits=kwargs['n_splits']).split(X=df_train.q2, groups=df_train.id)
 
@@ -278,10 +342,8 @@ def train_pytorch(**kwargs):
     # skf = StratifiedKFold(n_splits=kwargs['n_splits'], shuffle=True, random_state=RANDOM_SEED).split(X=df_train.q2, y=outputs)
 
     # oof = np.zeros((len(df_train),1))
-    test_preds = []
     all_pred = np.zeros(shape=(len(df_train), 2))
     all_true = np.zeros(shape=(len(df_train)))
-    best_scores = []
     for fold, (train_idx, valid_idx) in enumerate(gkf):
     # for fold, (train_idx, valid_idx) in enumerate(skf):
         logger.info(f'Fold No. {fold}')
@@ -305,7 +367,7 @@ def train_pytorch(**kwargs):
 
         train_set = HouseDataset(train_inputs, train_outputs)
         valid_set = HouseDataset(valid_inputs, valid_outputs)
-        test_set = HouseDataset(test_inputs, np.zeros_like(test_inputs[0])) # 测试集没有标签
+        # test_set = HouseDataset(test_inputs, np.zeros_like(test_inputs[0])) # 测试集没有标签
 
         logger.info('Train set size: {}, valid set size {}'.format(
             len(train_set), len(valid_set)))
@@ -315,10 +377,10 @@ def train_pytorch(**kwargs):
                                 shuffle=True)
 
         valid_loader = DataLoader(valid_set,
-                                batch_size=512)
+                                batch_size=2048)
 
-        test_loader = DataLoader(test_set,
-                                batch_size=512)
+        # test_loader = DataLoader(test_set,
+                                # batch_size=512)
 
         device = torch.device(f"cuda:{kwargs['device']}")
         model = BertForHouseQA().cuda(device)
@@ -353,6 +415,7 @@ def train_pytorch(**kwargs):
         #                                                        )
         # best_score = 0.0
         stopper = EarlyStopping(patience=kwargs['patience'], mode='max')
+        ckpt_path = None
         for epoch in range(kwargs['epoch']):
             pass
             # =======================Training===========================
@@ -403,7 +466,7 @@ def train_pytorch(**kwargs):
                 valid_loss = []
                 valid_pred = []
                 valid_true = []
-                steps = int(np.ceil(len(valid_set) / 512))
+                steps = int(np.ceil(len(valid_set) / 2048))
                 pbar = tqdm(desc='Validating', total=steps)
                 for i, sample in enumerate(valid_loader):
                     y_true_local = sample[1].numpy()
@@ -441,6 +504,10 @@ def train_pytorch(**kwargs):
                 # best_score = valid_auc
             stop_flag, best_flag = stopper.step(valid_f1)
             if best_flag:
+                # 删除之前保存的模型
+                if ckpt_path is not None:
+                    ckpt_path.unlink()
+                ckpt_path = CHECKPOINT_PATH / f"{MODEL_NAME}_{fold}_{epoch}_{stopper.best_score}.pt"
             # 保存目前的最佳模型
                 torch.save(
                     {
@@ -452,7 +519,7 @@ def train_pytorch(**kwargs):
                         "optimizer_state_dict": optimizer.state_dict(),
                         # 'scheduler_state_dict': scheduler.state_dict()
                     },
-                    f=os.path.join(CHECKPOINT_PATH, f"{MODEL_NAME}_{fold}_{epoch}_{stopper.best_score}.pt"),
+                    f=ckpt_path,
                 )
                 logger.info("A best score! Saved to checkpoints.")
                 # 保存每个验证折的预测值，用作最后整个训练集的f1评估
@@ -468,39 +535,6 @@ def train_pytorch(**kwargs):
             # print('Valid f1 score = ', valid_f1)
             # ==========================================================
 
-        # 每折训练结束后，进行一次预测
-        # best_scores.append(stopper.best_score)
-        # =======================Prediction========================
-        # Set model to evaluation mode.
-        # model.eval()
-        # with torch.no_grad():
-        #     # Prediction step
-        #     test_pred = []
-        #     steps = int(np.ceil(len(test_set) / 512))
-        #     for i, sample in tqdm(enumerate(test_loader), desc='Predicting', total=steps):
-        #         # y_true_local = sample[1].numpy()
-        #         x, y_true = sample[0].cuda(
-        #             device).long(), sample[1].cuda(device).float()
-
-        #         model_outputs = model(x)
-        #         # loss = criterion(model_outputs, y_true.unsqueeze(-1)).cpu().detach().item()
-        #         # y_pred = outputs.argmax(dim=1).cpu().numpy()
-        #         y_pred = model_outputs.cpu().detach().numpy()
-        #         test_pred.append(y_pred)
-        # test_pred = np.concatenate(test_pred, axis=0)
-        # test_preds.append(test_pred)
-        # ==========================================================
-        # Save the model at the end of every epoch.
-        # torch.save({
-        #     'model_name': 'BertForHouseQA',
-        #     'epoch': epoch,
-        #     'loss': loss,
-        #     'valid_f1': valid_f1,
-        #     'model_state_dict':  model.state_dict(),
-        #     'optimizer_state_dict': optimizer.state_dict(),
-        #     # 'scheduler_state_dict': scheduler.state_dict()
-        # }, f=os.path.join(CHECKPOINT_PATH, 'ckpt.pt'))
-
     # 结束后，评估整个训练集
     all_pred = np.argmax(all_pred, axis=1)
     all_auc = roc_auc_score(all_true, all_pred)
@@ -512,22 +546,25 @@ def train_pytorch(**kwargs):
     logger.info('Confusion Matrix: ')
     logger.info(confusion_matrix(y_true=all_true, y_pred=all_pred, normalize='all'))
     
-    return all_f1
+    return all_f1, CHECKPOINT_PATH
 
 
 def predict_pytorch(**kwargs):
     test_inputs = kwargs['test_inputs']
+    batch_size = 2048
     test_set = HouseDataset(test_inputs, np.zeros_like(test_inputs[0])) # 测试集没有标签
     test_loader = DataLoader(test_set,
-                            batch_size=512)
+                            batch_size=batch_size)
 
     device = torch.device(f"cuda:{kwargs['device']}")
     model = BertForHouseQA().cuda(device)
 
-    model_name = kwargs['model_name']
-    time_str = kwargs['time_str']
-    checkpoint_path = DATA_PATH / f"model_record/{model_name}/{time_str}" 
-    ckpt_paths = [x for x in checkpoint_path.iterdir() if x.is_file() and x.suffix != '.log']
+    # model_name = kwargs['model_name']
+    # time_str = kwargs['time_str']
+    # checkpoint_path = DATA_PATH / f"model_record/{model_name}/{time_str}" 
+    checkpoint_path = kwargs['checkpoint_path']
+    model_name = checkpoint_path.parent.name
+    ckpt_paths = [x for x in checkpoint_path.iterdir() if x.is_file() and x.suffix == '.pt']
 
     # 找出保存的模型在每个fold训练到的最大epoch
     fold2epoch = defaultdict(int)
@@ -555,7 +592,7 @@ def predict_pytorch(**kwargs):
         with torch.no_grad():
             # Prediction step
             test_pred = []
-            steps = int(np.ceil(len(test_set) / 512))
+            steps = int(np.ceil(len(test_set) / batch_size))
             for i, sample in tqdm(enumerate(test_loader), desc='Predicting', total=steps):
                 # y_true_local = sample[1].numpy()
                 x, y_true = sample[0].cuda(
@@ -563,22 +600,21 @@ def predict_pytorch(**kwargs):
 
                 model_outputs = model(x)
                 # loss = criterion(model_outputs, y_true.unsqueeze(-1)).cpu().detach().item()
-                # y_pred = outputs.argmax(dim=1).cpu().numpy()
+                # y_pred = outputs.argmax(dim=1).cpu().numpy() 
                 y_pred = model_outputs.cpu().detach().numpy()
                 test_pred.append(y_pred)
         test_pred = np.concatenate(test_pred, axis=0)
         test_preds.append(test_pred)
-    
-    return test_preds
 
+    sub = np.average(test_preds, axis=0) 
+    sub = np.argmax(sub, axis=1)
+    # sub = sub > best_t  # 用该分类阈值来输出测试集
+    df_test['label'] = sub.astype(int)
+    # fpath = DATA_PATH / f"model_record/{MODEL_NAME}/{test_time_str}/submission_beike_0.7947.csv"
+    fpath = checkpoint_path / f"submission_beike_{kwargs['score']}.csv"
+    df_test[['id','id_sub','label']].to_csv(fpath,index=False, header=None,sep='\t')
+    # return test_preds
 
-
-all_f1 = train_pytorch(batch_size=128, epoch=15, lr=2e-5, weight_decay=1e-3, n_splits=10, patience=8, device=0, inputs=inputs, 
-                                        outputs=outputs, test_inputs=test_inputs)
-# test_time_str = '2020-11-06-11:25:02'
-# test_preds = predict_pytorch(test_inputs=test_inputs, device=0, model_name=MODEL_NAME, time_str=test_time_str) 
-
-                                
 
 # %%
 # def create_model():
@@ -638,15 +674,20 @@ all_f1 = train_pytorch(batch_size=128, epoch=15, lr=2e-5, weight_decay=1e-3, n_s
 # best_score = np.average(best_scores)
 # logger.info(f'Best score: {best_score}')
 # %%
-sub = np.average(test_preds, axis=0) 
-sub = np.argmax(sub, axis=1)
+# sub = np.average(test_preds, axis=0) 
+# sub = np.argmax(sub, axis=1)
 # sub = sub > best_t  # 用该分类阈值来输出测试集
-df_test['label'] = sub.astype(int)
-# df_test[['id','id_sub','label']].to_csv(f'{CHECKPOINT_PATH}/submission_beike_{all_f1}.csv',index=False, header=None,sep='\t')
-fpath = DATA_PATH / f"model_record/{MODEL_NAME}/{test_time_str}/submission_beike_0.7939.csv"
-df_test[['id','id_sub','label']].to_csv(fpath,index=False, header=None,sep='\t')
+# df_test['label'] = sub.astype(int)
+# fpath = DATA_PATH / f"model_record/{MODEL_NAME}/{test_time_str}/submission_beike_0.7947.csv"
+# fpath = DATA_PATH / f"model_record/{MODEL_NAME}/{test_time_str}/submission_beike_{score}.csv"
+# df_test[['id','id_sub','label']].to_csv(fpath,index=False, header=None,sep='\t')
 
-# %%
+
+if __name__ == "__main__":
+    all_f1, checkpoint_path = train_pytorch(batch_size=128, epoch=15, lr=2e-5, weight_decay=1e-3, n_splits=20, patience=8, device=1, inputs=inputs, 
+                                        outputs=outputs, test_inputs=test_inputs)
+    # checkpoint_path = DATA_PATH / f'model_record/{MODEL_NAME}/2020-11-06-19:33:15'
+    predict_pytorch(test_inputs=test_inputs, device=1, checkpoint_path=checkpoint_path, score=all_f1)
 
 
 
