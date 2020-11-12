@@ -8,3 +8,4 @@
 * LCQMC!!!!!
 * 增加交叉验证的 k 值
 * 爬取房产论坛数据，扩大数据集
+* 使用两阶段微调，point-wise (CrossEntropyLoss) + pair-wise (HingeLoss)
