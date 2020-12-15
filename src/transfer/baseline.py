@@ -65,7 +65,7 @@ MAX_SEQUENCE_LENGTH = 100
 MODEL_NAME = "bert-base-chinese-cmrc"
 CHECKPOINT_PATH = DATA_PATH / f"model_record/{MODEL_NAME}"
 if not CHECKPOINT_PATH.exists():
-    CHECKPOINT_PATH.mkdir()
+    CHECKPOINT_PATH.mkdir(parents=True)
 PRETRAIN_MODEL_PATH = DATA_PATH / "pretrain_model"
 # input_categories = ['q1','q2']
 input_categories = ["query", "answer"]
@@ -230,6 +230,7 @@ class BertForHouseQA(nn.Module):
         self.dropout = nn.Dropout(0.5)
         # self.fc = nn.Linear(4*self.bert.config.hidden_size, 1)
         self.fc = nn.Linear(self.bert.config.hidden_size, 2)
+        # self.fc = nn.Linear(3*self.bert.config.hidden_size, 2)
         # self.sigmoid = nn.Sigmoid()
         self.tanh = nn.Tanh()
 
@@ -243,9 +244,11 @@ class BertForHouseQA(nn.Module):
         # e = hidden_state[:, 0] # [b, hid]
 
         # feat = torch.cat([q, a, t, e], dim=-1) # [b, 4*hid]
-        feat = hidden_state[:, 0, :]
+        # feat_cls = hidden_state[:, 0, :]
+        feat_mean = torch.mean(hidden_state, dim=1)
+        # feat_max, _ = torch.max(hidden_state, dim=1)
 
-        feat = self.dropout(feat)
+        feat = self.dropout(feat_mean)
         logit = self.tanh(self.fc(feat))
         return logit
 
@@ -305,7 +308,7 @@ def train_pytorch(**kwargs):
     #                                                        verbose=True
     #                                                        )
 
-    best_metric = 0.0
+    best_score = 0.0
 
     for epoch in range(kwargs["epoch"]):
         # =======================Training===========================
@@ -374,8 +377,8 @@ def train_pytorch(**kwargs):
         # 保存每个验证折的预测值，用作最后整个训练集的f1评估
         # valid_f1, _ = search_f1(valid_outputs, valid_pred)  # 寻找最佳分类阈值和f1 score
         # logger.info(f"Valid f1 score {valid_f1}")
-        if valid_auc > best_metric:
-            best_metric = valid_auc
+        if valid_auc > best_score:
+            best_score = valid_auc
             # 保存最佳f1模型
             torch.save(
                 {
@@ -387,7 +390,7 @@ def train_pytorch(**kwargs):
                     "optimizer_state_dict": optimizer.state_dict(),
                     # 'scheduler_state_dict': scheduler.state_dict()
                 },
-                f=os.path.join(CHECKPOINT_PATH, f"{MODEL_NAME}_{best_metric}.pt"),
+                f=os.path.join(CHECKPOINT_PATH, f"{MODEL_NAME}_{best_score}.pt"),
             )
             logger.info("A best auc! Saved to checkpoints.")
         # ==========================================================

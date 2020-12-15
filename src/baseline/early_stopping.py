@@ -4,7 +4,6 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-
 class EarlyStopping(object):
     def __init__(self, patience=10, mode='min'):
         self.patience = patience

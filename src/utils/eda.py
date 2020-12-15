@@ -8,11 +8,12 @@ import jieba
 import synonyms
 import random
 from random import shuffle
+from pathlib import Path
 
 random.seed(2019)
 
 #停用词列表，默认使用哈工大停用词表
-f = open('stopwords/HIT_stop_words.txt')
+f = open(Path(__file__).parent/'stopwords/HIT_stop_words.txt')
 stop_words = list()
 for stop_word in f.readlines():
     stop_words.append(stop_word[:-1])
@@ -155,7 +156,6 @@ def eda(sentence, alpha_sr=0.1, alpha_ri=0.1, alpha_rs=0.1, p_rd=0.1, num_aug=9)
         a_words = random_swap(words, n_rs)
         augmented_sentences.append(' '.join(a_words))
 
-   
     #随机删除rd
     for _ in range(num_new_per_technique):
         a_words = random_deletion(words, p_rd)
@@ -174,9 +174,40 @@ def eda(sentence, alpha_sr=0.1, alpha_ri=0.1, alpha_rs=0.1, p_rd=0.1, num_aug=9)
 
     return augmented_sentences
 
+
+def eda_one(sentence, alpha_sr=0.1, alpha_ri=0.1, alpha_rs=0.1, p_rd=0.1):
+    seg_list = jieba.cut(sentence)
+    seg_list = " ".join(seg_list)
+    words = list(seg_list.split())
+    num_words = len(words)
+
+    eda_method = random.randint(0, 3)
+
+    n_sr = max(1, int(alpha_sr * num_words))
+    n_ri = max(1, int(alpha_ri * num_words))
+    n_rs = max(1, int(alpha_rs * num_words))
+
+    #同义词替换sr
+    if eda_method == 0:
+        a_words = synonym_replacement(words, n_sr)
+
+    #随机插入ri
+    elif eda_method == 1:
+        a_words = random_insertion(words, n_ri)
+    
+    #随机交换rs
+    elif eda_method == 2:
+        a_words = random_swap(words, n_rs)
+
+    #随机删除rd
+    elif eda_method == 3:
+        a_words = random_deletion(words, p_rd)
+    
+    return ''.join(a_words)
+
 ##
 #测试用例
-#eda(sentence="我们就像蒲公英，我也祈祷着能和你飞去同一片土地")
+print(eda_one(sentence="我们就像蒲公英，我也祈祷着能和你飞去同一片土地"))
 
 def get_eda(sentence, alpha=0.1, num_aug=4):
     aug_sentences = eda(sentence, alpha_sr=alpha, alpha_ri=alpha, alpha_rs=alpha, p_rd=alpha, num_aug=num_aug)
